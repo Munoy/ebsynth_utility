@@ -4,6 +4,7 @@ import glob
 import shutil
 import numpy as np
 import math
+import mediapipe as mp
 
 #---------------------------------
 # Copied from PySceneDetect
@@ -116,7 +117,125 @@ def remove_pngs_in_dir(path):
     for png in pngs:
         os.remove(png)
 
-def ebsynth_utility_stage2(dbg, project_args, key_min_gap, key_max_gap, key_th, key_add_last_frame, is_invert_mask):
+def mp_args():
+    mp_drawing = mp.solutions.drawing_utils
+    mp_face_mesh = mp.solutions.face_mesh
+    drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
+    mp_drawing_styles = mp.solutions.drawing_styles
+    
+    return [mp_drawing, mp_face_mesh, drawing_spec, mp_drawing_styles]
+
+def getLandmarks(image):
+    _, mp_face_mesh, _, _ = mp_args()
+    
+    face_mesh = mp_face_mesh.FaceMesh(min_detection_confidence=0.4, min_tracking_confidence=0.4)
+    # To improve performance, optionally mark the image as not writeable to
+    # pass by reference.
+    image.flags.writeable = False
+    results = face_mesh.process(image)
+    try:
+        landmarks = results.multi_face_landmarks[0].landmark
+    except:
+        landmarks = False
+    return landmarks, results
+
+def x_y_z(landmakr, image):
+    landmakrs, _ = getLandmarks(image)
+    if not landmakrs:
+        return 1, 1, 1
+    x = int(landmakrs[landmakr].x * 100000)
+    y = int(landmakrs[landmakr].y * 100000)
+    z = int(landmakrs[landmakr].z * 100000 * 2)
+    
+    return (x, y, z)
+
+def dist_dots(landmark1, landmark2, image):
+    one = x_y_z(landmark1, image)
+    two = x_y_z(landmark2, image)
+    
+    dx = (one[0] - two[0])**2
+    dy = (one[1] - two[1])**2
+    dz = (one[2] - two[2])**2
+
+    return int(math.sqrt(dx + dy + dz))
+
+def add_key_frame(frame_path, key_list):
+    # frames = sorted(glob.glob( os.path.join(frame_path, "[0-9]*.png") ))
+    
+    temp_key_list = key_list.copy()
+    
+    i = 0
+    # print(len(key_list))
+    while True:
+        temp_key_frame = 0
+        # print('key_list: ', key_list)
+        
+        f_key = key_list[i]
+        s_key = key_list[i+1]
+        # print(f_key, s_key, i)
+        
+        key_frames = []
+        for j in range(f_key, s_key+1):
+            key_frames.append(os.path.join(frame_path, f'{str(j).zfill(5)}.png'))
+            
+        # print(key_frames, "\n\n----------")
+        img1 = cv2.imread(key_frames[0])
+        img2 = cv2.imread(key_frames[-1])
+        
+        top = 0
+        bottom = 17
+        left = 61
+        right = 375
+        
+        top_bottom = max(dist_dots(top, bottom, img1), 1)
+        left_right = max(dist_dots(left, right, img1), 1)
+        
+        f = int(top_bottom/left_right * 1000)
+        
+        top_bottom = max(dist_dots(top, bottom, img2), 1)
+        left_right = max(dist_dots(left, right, img2), 1)
+        
+        l = int(top_bottom/left_right * 1000)
+        
+        
+        if f < l:
+            base = l
+        else:
+            base = f
+        
+        temp_key = [0, 0]
+        for key in (key_frames):
+            img = cv2.imread(key)
+            
+            top_bottom = max(dist_dots(top, bottom, img), 1)
+            left_right = max(dist_dots(left, right, img), 1)
+            
+            n =  int(top_bottom/left_right * 1000)
+            
+            
+            # print(now_ratio)
+            if base * 1.05 < n:
+                if temp_key[0] < n:
+                    temp_key = [n, key]
+                    # print(f'{key},f: {f}, l: {l}, n: {n}')
+            # print(temp_key[1])
+        if temp_key[1] == 0:
+            temp_key_list.append(0)
+        else:
+            temp_key_list.append(int(os.path.basename(temp_key[1])[:-4]))
+
+
+        i += 1
+        if i == len(key_list)-1:
+            break
+    print(temp_key_list)
+    keys = sorted(list(set(temp_key_list)))
+    if keys[0] == 0:
+        keys.remove(0)
+    return keys
+
+
+def ebsynth_utility_stage2(dbg, project_args, key_min_gap, key_max_gap, key_th, key_add_last_frame, is_invert_mask, face_analysis):
     dbg.print("stage2")
     dbg.print("")
 
@@ -153,11 +272,17 @@ def ebsynth_utility_stage2(dbg, project_args, key_min_gap, key_max_gap, key_th, 
     keys = analyze_key_frames(frame_path, frame_mask_path, key_th, key_min_gap, key_max_gap, key_add_last_frame, is_invert_mask)
 
     dbg.print("keys : " + str(keys))
+    print('keys1 : '+ str(keys))
+    
+    if face_analysis:
+        keys = add_key_frame(frame_path, keys)
     
     for k in keys:
         filename = str(k).zfill(5) + ".png"
         shutil.copy( os.path.join( frame_path , filename) , os.path.join(org_key_path, filename) )
-
+    
+    print("=====================================")
+    print(keys)
 
     dbg.print("")
     dbg.print("Keyframes are output to [" + org_key_path + "]")

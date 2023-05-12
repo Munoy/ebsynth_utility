@@ -22,3 +22,5 @@ if not launch.is_installed("seaborn"):
 if not launch.is_installed("color_matcher"):
     launch.run_pip("install color-matcher", "requirements for Ebsynth Utility")
 
+if not launch.is_installed("mediapipe"):
+    launch.run_pip("install mediapipe==0.9.1.0", "requirements for Ebsynth Utility")

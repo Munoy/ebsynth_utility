@@ -56,10 +56,11 @@ def on_ui_tabs():
                                         clipseg_mask_blur_size2 = gr.Slider(minimum=0, maximum=150, step=1, label='Mask Blur Kernel Size(GaussianBlur)', value=11)
 
                                 with gr.TabItem(label="stage 2", elem_id='ebs_configuration_tab2'):
-                                    key_min_gap = gr.Slider(minimum=0, maximum=500, step=1, label='Minimum keyframe gap', value=10)
+                                    key_min_gap = gr.Slider(minimum=0, maximum=500, step=1, label='Minimum keyframe gap', value=40)
                                     key_max_gap = gr.Slider(minimum=0, maximum=1000, step=1, label='Maximum keyframe gap', value=300)
                                     key_th = gr.Slider(minimum=0.0, maximum=100.0, step=0.1, label='Threshold of delta frame edge', value=8.5)
                                     key_add_last_frame = gr.Checkbox(label="Add last frame to keyframes", value=True)
+                                    face_analysis = gr.Checkbox(label="Analyze the face and add keyframes.", value=True)
 
                                 with gr.TabItem(label="stage 3.5", elem_id='ebs_configuration_tab3_5'):
                                     gr.HTML(value="<p style='margin-bottom: 0.7em'>\
@@ -163,6 +164,7 @@ def on_ui_tabs():
                     key_max_gap,
                     key_th,
                     key_add_last_frame,
+                    face_analysis,
 
                     color_matcher_method,
                     st3_5_use_mask,
